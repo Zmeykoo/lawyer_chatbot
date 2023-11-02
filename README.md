@@ -17,10 +17,12 @@ Let's take two identical sentenceі in different languages(Eng, Ukr):
     <img src="images/good_morning_ukr.png" alt="ukr" style="width: 45%;">
 </div>
 Difference in the number of tokens three times.
+
 Now try to compare article:
 <div style="display: flex; justify-content: space-between;">
     <img src="images/article14eng.png" alt="eng" style="width: 45%;">
     <img src="images/article14ukr.png" alt="ukr" style="width: 45%;">
 </div>
+
 
 ...
