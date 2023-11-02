@@ -10,6 +10,9 @@ To update the LLM model I found 4 main approaches: Prompting, Embeddins, Agents 
 Before considering the approaches, it is important to talk about tokenization. 
 Tokenization - the process of converting a sequence of text into smaller units, known as tokens. Thanks to this process, the model begins to understand and process the meaning of words. I use tokenizer for GPT-3.5.
 1 token ~= ¾ English words. So 1000 Eng words is about 750 tokens. But the tokenizer converts words of other languages differently. It divides them into even smaller units therefore the total number of units and the price are higher. For exaple:
-Let's take two identical articles in different languages(Ukr, Eng):
+
+Let's take two identical sentenceі in different languages(Eng, Ukr):
+![image info](images/good_morning_eng.png) ![image info](images/good_morning_ukr.png)
+
 
 ...
