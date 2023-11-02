@@ -14,5 +14,10 @@ Tokenization - the process of converting a sequence of text into smaller units, 
 Let's take two identical sentenceі in different languages(Eng, Ukr):
 <img src="images/good_morning_eng.png" width="450" height="250"> <img src="images/good_morning_ukr.png" width="450" height="250">
 
+<div style="display: flex; justify-content: space-between;">
+    <img src="images/good_morning_eng.png" alt="Image 1" style="width: 45%;">
+    <img src="images/good_morning_ukr.png" alt="Image 2" style="width: 45%;">
+</div>
+
 
 ...
