@@ -12,12 +12,15 @@ Tokenization - the process of converting a sequence of text into smaller units, 
 1 token ~= ¾ English words. So 1000 Eng words is about 750 tokens. But the tokenizer converts words of other languages differently. It divides them into even smaller units therefore the total number of units and the price are higher. For exaple:
 
 Let's take two identical sentenceі in different languages(Eng, Ukr):
-<img src="images/good_morning_eng.png" width="450" height="250"> <img src="images/good_morning_ukr.png" width="450" height="250">
-
 <div style="display: flex; justify-content: space-between;">
-    <img src="images/good_morning_eng.png" alt="Image 1" style="width: 45%;">
-    <img src="images/good_morning_ukr.png" alt="Image 2" style="width: 45%;">
+    <img src="images/good_morning_eng.png" alt="eng" style="width: 45%;">
+    <img src="images/good_morning_ukr.png" alt="ukr" style="width: 45%;">
 </div>
-
+Difference in the number of tokens three times.
+Now try to compare article:
+<div style="display: flex; justify-content: space-between;">
+    <img src="images/article14eng.png" alt="eng" style="width: 45%;">
+    <img src="images/article14ukr.png" alt="ukr" style="width: 45%;">
+</div>
 
 ...
