@@ -1,1 +1,6 @@
+response/*
+
 .env
+.vscode
+.idea
+*.pyc

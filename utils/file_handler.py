@@ -1,4 +1,6 @@
+from datetime import date
 import os
+from pathlib import Path
 
 from PyPDF2 import PdfReader
 import docx
@@ -40,3 +42,16 @@ class Reader:
             elif filename.endswith(".txt"):
                 combined_text += Reader.read_txt(file_path)
         return combined_text
+
+class Writer:
+    @staticmethod
+    def write_txt(text, query_name):
+        save_dir = Path("response")
+        save_dir.mkdir(exist_ok=True)
+        date_str = date.today().isoformat()
+
+        num = 0
+        while (path := save_dir / f"{query_name}_{date_str}_({num}).txt").exists():
+            num += 1
+
+        path.write_text(text, encoding="utf-8")
