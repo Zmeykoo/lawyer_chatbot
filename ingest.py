@@ -12,6 +12,7 @@ from pathlib import Path
 
 from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
+from tqdm import tqdm
 
 from config import settings
 from utils.file_handler import Reader
@@ -84,7 +85,11 @@ def main() -> None:
         recreate_collection(client, vector_size)
 
     store = get_vectorstore(embeddings)
-    store.add_documents(chunks)
+    batch_size = settings.INGEST_BATCH_SIZE
+    for start in tqdm(
+        range(0, len(chunks), batch_size), desc="Indexing", unit="batch"
+    ):
+        store.add_documents(chunks[start : start + batch_size])
     print(f"Indexed {len(chunks)} chunks into '{settings.COLLECTION_NAME}'. Done.")
 
 

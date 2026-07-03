@@ -20,7 +20,7 @@ class Settings:
     # --- Hugging Face encoders (transformers / sentence-transformers) ---
     # Any model id from the Hub, e.g. "intfloat/multilingual-e5-base".
     HF_EMBEDDING_MODEL: str = os.getenv(
-        "HF_EMBEDDING_MODEL", "Goader/modern-liberta-large"
+        "HF_EMBEDDING_MODEL", "intfloat/multilingual-e5-base"
     )
     # "cpu", "cuda", "cuda:0", "mps", ...
     HF_DEVICE: str = os.getenv("HF_DEVICE", "cpu")
@@ -42,6 +42,8 @@ class Settings:
     CHUNK_SIZE: int = int(os.getenv("CHUNK_SIZE", "1200"))
     CHUNK_OVERLAP: int = int(os.getenv("CHUNK_OVERLAP", "150"))
     TOP_K: int = int(os.getenv("TOP_K", "5"))
+    # Chunks embedded/upserted per batch during ingestion (progress granularity).
+    INGEST_BATCH_SIZE: int = int(os.getenv("INGEST_BATCH_SIZE", "64"))
 
 
 settings = Settings()
