@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import streamlit as st
 
+from chat_log import log_turn, new_session_id
 from chatbot import LawyerChatbot
 from config import settings
 
@@ -16,9 +17,13 @@ def load_bot() -> LawyerChatbot:
 
 def main() -> None:
     st.title("⚖️ Юридичний асистент")
+    if settings.RERANK_ENABLED:
+        rerank_status = f"реранкер ✅ ({settings.RERANK_MODEL})"
+    else:
+        rerank_status = "реранкер ❌"
     st.caption(
         f"RAG над Кримінальним кодексом України · модель {settings.LLM_MODEL} · "
-        f"Qdrant `{settings.COLLECTION_NAME}`"
+        f"Qdrant `{settings.COLLECTION_NAME}` · {rerank_status}"
     )
 
     if not settings.OPENAI_API_KEY:
@@ -37,6 +42,8 @@ def main() -> None:
 
     if "messages" not in st.session_state:
         st.session_state.messages = []
+    if "session_id" not in st.session_state:
+        st.session_state.session_id = new_session_id()
 
     for msg in st.session_state.messages:
         with st.chat_message(msg["role"]):
@@ -59,6 +66,15 @@ def main() -> None:
                     st.caption(doc.page_content[:500] + "…")
         st.session_state.messages.append(
             {"role": "assistant", "content": answer.text}
+        )
+        # One user+assistant exchange = one logged turn.
+        turn = sum(1 for m in st.session_state.messages if m["role"] == "user")
+        log_turn(
+            session_id=st.session_state.session_id,
+            turn=turn,
+            question=question,
+            answer=answer.text,
+            sources=answer.sources,
         )
 
 

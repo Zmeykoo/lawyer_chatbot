@@ -9,6 +9,7 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
 
 from config import settings
+from reranker import rerank
 from vectorstore import get_vectorstore
 
 SYSTEM_PROMPT = """Ти викладач кримінального права України.
@@ -51,13 +52,19 @@ class LawyerChatbot:
             temperature=settings.TEMPERATURE,
             api_key=settings.OPENAI_API_KEY,
         )
+        # With reranking on, retrieve a larger candidate pool and let the
+        # cross-encoder narrow it down to TOP_K; otherwise fetch TOP_K directly.
+        self.rerank_enabled = settings.RERANK_ENABLED
+        fetch_k = settings.RERANK_CANDIDATES if self.rerank_enabled else settings.TOP_K
         self.retriever = get_vectorstore().as_retriever(
-            search_kwargs={"k": settings.TOP_K}
+            search_kwargs={"k": fetch_k}
         )
         self.chain = PROMPT | self.llm | StrOutputParser()
 
     def ask(self, question: str) -> Answer:
         docs = self.retriever.invoke(question)
+        if self.rerank_enabled:
+            docs = rerank(question, docs, top_k=settings.TOP_K)
         text = self.chain.invoke(
             {"question": question, "context": _format_context(docs)}
         )

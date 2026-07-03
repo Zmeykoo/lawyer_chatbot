@@ -9,3 +9,4 @@ __pycache__/
 venv/
 qdrant_storage/
 qdrant_data/
+chat_logs/
