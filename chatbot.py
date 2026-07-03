@@ -10,7 +10,7 @@ from langchain_openai import ChatOpenAI
 
 from config import settings
 from reranker import rerank
-from vectorstore import get_vectorstore
+from vectorstore import get_client, get_vectorstore, latest_collection_name
 
 SYSTEM_PROMPT = """Ти викладач кримінального права України.
 Відповідай державною (українською) мовою, спираючись ВИКЛЮЧНО на наведені нижче \
@@ -56,9 +56,12 @@ class LawyerChatbot:
         # cross-encoder narrow it down to TOP_K; otherwise fetch TOP_K directly.
         self.rerank_enabled = settings.RERANK_ENABLED
         fetch_k = settings.RERANK_CANDIDATES if self.rerank_enabled else settings.TOP_K
-        self.retriever = get_vectorstore().as_retriever(
-            search_kwargs={"k": fetch_k}
-        )
+        # Bind to the most recent ingest; its timestamped name tells you when it
+        # was built.
+        self.collection_name = latest_collection_name(get_client())
+        self.retriever = get_vectorstore(
+            collection_name=self.collection_name
+        ).as_retriever(search_kwargs={"k": fetch_k})
         self.chain = PROMPT | self.llm | StrOutputParser()
 
     def ask(self, question: str) -> Answer:

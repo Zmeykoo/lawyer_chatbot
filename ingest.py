@@ -16,7 +16,14 @@ from tqdm import tqdm
 
 from config import settings
 from utils.file_handler import Reader
-from vectorstore import get_client, get_embeddings, get_vectorstore, recreate_collection
+from vectorstore import (
+    get_client,
+    get_embeddings,
+    get_vectorstore,
+    latest_collection_name,
+    new_collection_name,
+    recreate_collection,
+)
 
 # Matches an article header like "Стаття 126-1." at the start of a line.
 ARTICLE_RE = re.compile(r"(?m)^(Стаття\s+[\d\-]+\..*)$")
@@ -79,18 +86,25 @@ def main() -> None:
     embeddings = get_embeddings()
     client = get_client()
 
-    if args.recreate or not client.collection_exists(settings.COLLECTION_NAME):
+    existing = latest_collection_name(client)
+    if args.recreate or existing is None:
+        # Each (re)build lives in its own timestamped collection, so the name
+        # records when the ingest was created.
+        collection_name = new_collection_name()
         vector_size = len(embeddings.embed_query("dimension probe"))
-        print(f"Creating collection '{settings.COLLECTION_NAME}' (dim={vector_size}).")
-        recreate_collection(client, vector_size)
+        print(f"Creating collection '{collection_name}' (dim={vector_size}).")
+        recreate_collection(client, vector_size, collection_name)
+    else:
+        collection_name = existing
+        print(f"Adding to existing collection '{collection_name}'.")
 
-    store = get_vectorstore(embeddings)
+    store = get_vectorstore(embeddings, collection_name=collection_name)
     batch_size = settings.INGEST_BATCH_SIZE
     for start in tqdm(
         range(0, len(chunks), batch_size), desc="Indexing", unit="batch"
     ):
         store.add_documents(chunks[start : start + batch_size])
-    print(f"Indexed {len(chunks)} chunks into '{settings.COLLECTION_NAME}'. Done.")
+    print(f"Indexed {len(chunks)} chunks into '{collection_name}'. Done.")
 
 
 if __name__ == "__main__":

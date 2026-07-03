@@ -17,14 +17,6 @@ def load_bot() -> LawyerChatbot:
 
 def main() -> None:
     st.title("⚖️ Юридичний асистент")
-    if settings.RERANK_ENABLED:
-        rerank_status = f"реранкер ✅ ({settings.RERANK_MODEL})"
-    else:
-        rerank_status = "реранкер ❌"
-    st.caption(
-        f"RAG над Кримінальним кодексом України · модель {settings.LLM_MODEL} · "
-        f"Qdrant `{settings.COLLECTION_NAME}` · {rerank_status}"
-    )
 
     if not settings.OPENAI_API_KEY:
         st.error("OPENAI_API_KEY не задано. Додайте його у .env і перезапустіть.")
@@ -39,6 +31,15 @@ def main() -> None:
             f"Деталі: {exc}"
         )
         st.stop()
+
+    if settings.RERANK_ENABLED:
+        rerank_status = f"реранкер ✅ ({settings.RERANK_MODEL})"
+    else:
+        rerank_status = "реранкер ❌"
+    st.caption(
+        f"RAG над Кримінальним кодексом України · модель {settings.LLM_MODEL} · "
+        f"Qdrant `{bot.collection_name}` · {rerank_status}"
+    )
 
     if "messages" not in st.session_state:
         st.session_state.messages = []

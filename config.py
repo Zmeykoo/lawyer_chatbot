@@ -33,6 +33,8 @@ class Settings:
     # Qdrant runs in-process and persists to this local directory — no server
     # or separate container required.
     QDRANT_PATH: str = os.getenv("QDRANT_PATH", "qdrant_data")
+    # Base collection name. Each ingest creates "{COLLECTION_NAME}_{UTC-timestamp}"
+    # so the name records when the index was built; readers use the newest one.
     COLLECTION_NAME: str = os.getenv("COLLECTION_NAME", "ukr_criminal_code")
 
     # --- Ingestion / retrieval ---
