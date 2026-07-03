@@ -1,0 +1,15 @@
+.git
+.gitignore
+.env
+.venv
+venv
+__pycache__
+*.pyc
+.vscode
+.idea
+*.ipynb
+response/
+images/
+dataset/
+qdrant_storage/
+qdrant_data/
