@@ -5,6 +5,7 @@ langchain-openai==0.3.28
 langchain-qdrant==0.2.0
 langchain-text-splitters==0.3.9
 openai==1.99.1
+ragas
 
 # --- Hugging Face encoders (optional, EMBEDDING_PROVIDER=huggingface) ---
 langchain-huggingface==0.3.0
