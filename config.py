@@ -61,6 +61,17 @@ class Settings:
     # "cpu", "cuda", "cuda:0", "mps", ... (defaults to the HF embedding device).
     RERANK_DEVICE: str = os.getenv("RERANK_DEVICE", os.getenv("HF_DEVICE", "cpu"))
 
+    # --- Token pricing ---
+    # Prices are resolved per model (by LLM_MODEL) from a community-maintained
+    # catalog rather than hardcoded, then cached to disk for offline runs. See
+    # pricing.py. Point MODEL_PRICES_URL at a fork/mirror to pin versions.
+    MODEL_PRICES_URL: str = os.getenv(
+        "MODEL_PRICES_URL",
+        "https://raw.githubusercontent.com/BerriAI/litellm/main/"
+        "model_prices_and_context_window.json",
+    )
+    MODEL_PRICES_CACHE: str = os.getenv("MODEL_PRICES_CACHE", ".model_prices.json")
+
     # --- Chat logging ---
     # Append each Q&A turn as one JSON line under CHAT_LOG_PATH. No DB needed;
     # the JSONL can be bulk-loaded into a database later.

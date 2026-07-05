@@ -65,6 +65,14 @@ def main() -> None:
                         f"**{doc.metadata.get('title', doc.metadata.get('article', 'джерело'))}**"
                     )
                     st.caption(doc.page_content[:500] + "…")
+
+            usage = answer.usage
+            cols = st.columns(4)
+            cols[0].metric("Вхідні токени", f"{usage.input_tokens:,}")
+            cols[1].metric("З кешу", f"{usage.cached_tokens:,}")
+            cols[2].metric("Вихідні токени", f"{usage.output_tokens:,}")
+            cols[3].metric("Вартість", f"${usage.cost_usd:.6f}")
+
         st.session_state.messages.append(
             {"role": "assistant", "content": answer.text}
         )
@@ -76,6 +84,7 @@ def main() -> None:
             question=question,
             answer=answer.text,
             sources=answer.sources,
+            usage=answer.usage.as_dict(),
         )
 
 

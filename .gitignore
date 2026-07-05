@@ -9,3 +9,4 @@ qdrant_storage/
 qdrant_data/
 chat_logs/
 data/response/
+.model_prices.json

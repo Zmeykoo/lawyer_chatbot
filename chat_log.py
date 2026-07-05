@@ -40,6 +40,7 @@ def log_turn(
     question: str,
     answer: str,
     sources: list[Document],
+    usage: dict | None = None,
 ) -> None:
     """Append one Q&A turn as a JSON line. Best-effort: never raises to caller."""
     if not settings.CHAT_LOG_ENABLED:
@@ -55,6 +56,8 @@ def log_turn(
         "llm_model": settings.LLM_MODEL,
         "rerank_enabled": settings.RERANK_ENABLED,
         "rerank_model": settings.RERANK_MODEL if settings.RERANK_ENABLED else None,
+        # Generator token accounting (input / cached / output / total / cost_usd).
+        "usage": usage or {},
     }
 
     try:
