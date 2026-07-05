@@ -1,6 +1,8 @@
 """Streamlit chat UI for the Ukrainian criminal-law RAG assistant."""
 from __future__ import annotations
 
+import time
+
 import streamlit as st
 
 from chat_log import log_turn, new_session_id
@@ -56,11 +58,13 @@ def main() -> None:
             st.markdown(question)
 
         with st.chat_message("assistant"):
+            start = time.perf_counter()
             with st.spinner("Аналізую Кримінальний кодекс..."):
                 answer = bot.stream(question)
             # Streams tokens as they arrive; returns the full text when done.
             # After this call answer.text and answer.usage are populated.
             st.write_stream(answer)
+            elapsed = time.perf_counter() - start
             with st.expander("Використані статті"):
                 for doc in answer.sources:
                     st.markdown(
@@ -69,11 +73,12 @@ def main() -> None:
                     st.caption(doc.page_content[:500] + "…")
 
             usage = answer.usage
-            cols = st.columns(4)
+            cols = st.columns(5)
             cols[0].metric("Вхідні токени", f"{usage.input_tokens:,}")
             cols[1].metric("З кешу", f"{usage.cached_tokens:,}")
             cols[2].metric("Вихідні токени", f"{usage.output_tokens:,}")
             cols[3].metric("Вартість", f"${usage.cost_usd:.6f}")
+            cols[4].metric("Час відповіді", f"{elapsed:.1f} с")
 
         st.session_state.messages.append(
             {"role": "assistant", "content": answer.text}
