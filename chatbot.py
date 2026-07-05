@@ -125,6 +125,28 @@ def _format_context(docs: list[Document]) -> str:
     )
 
 
+def _dedupe_by_article(docs: list[Document]) -> list[Document]:
+    """Keep at most one chunk per article, preserving order (best-ranked first).
+
+    A long article is split into several chunks at ingest, all sharing the same
+    ``article``/``title`` metadata, so vector search or reranking can surface
+    multiple chunks of the same article — which reads as "the same source
+    repeated". Since ``docs`` arrive ranked best-first, the first chunk seen for
+    an article is its most relevant one; keep it and drop the rest. Falls back to
+    the chunk text as the key (collapsing byte-identical chunks, e.g. from an
+    accidental double ingest) when an article has no metadata.
+    """
+    seen: set[str] = set()
+    unique: list[Document] = []
+    for d in docs:
+        key = d.metadata.get("article") or d.metadata.get("title") or d.page_content
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(d)
+    return unique
+
+
 class LawyerChatbot:
     def __init__(self) -> None:
         self.llm = ChatOpenAI(
@@ -136,9 +158,13 @@ class LawyerChatbot:
             stream_usage=True,
         )
         # With reranking on, retrieve a larger candidate pool and let the
-        # cross-encoder narrow it down to TOP_K; otherwise fetch TOP_K directly.
+        # cross-encoder narrow it down. Otherwise over-fetch a small multiple of
+        # TOP_K so that collapsing multi-chunk articles to one entry each (see
+        # _dedupe_by_article) still leaves TOP_K distinct articles.
         self.rerank_enabled = settings.RERANK_ENABLED
-        fetch_k = settings.RERANK_CANDIDATES if self.rerank_enabled else settings.TOP_K
+        fetch_k = (
+            settings.RERANK_CANDIDATES if self.rerank_enabled else settings.TOP_K * 4
+        )
         # Bind to the most recent ingest; its timestamped name tells you when it
         # was built.
         self.collection_name = latest_collection_name(get_client())
@@ -149,10 +175,18 @@ class LawyerChatbot:
         # survives the chain and can be accounted for.
         self.chain = PROMPT | self.llm
 
-    def ask(self, question: str) -> Answer:
+    def _retrieve(self, question: str) -> list[Document]:
+        """Fetch, (optionally) rerank, dedupe by article, and keep TOP_K."""
         docs = self.retriever.invoke(question)
         if self.rerank_enabled:
-            docs = rerank(question, docs, top_k=settings.TOP_K)
+            # Rank the whole candidate pool (don't truncate yet); dedupe and the
+            # TOP_K cut happen below, after duplicate articles are collapsed.
+            docs = rerank(question, docs, top_k=len(docs))
+        docs = _dedupe_by_article(docs)
+        return docs[: settings.TOP_K]
+
+    def ask(self, question: str) -> Answer:
+        docs = self._retrieve(question)
         message: AIMessage = self.chain.invoke(
             {"question": question, "context": _format_context(docs)}
         )
@@ -164,9 +198,7 @@ class LawyerChatbot:
 
     def stream(self, question: str) -> StreamingAnswer:
         """Retrieve context, then stream the LLM answer token by token."""
-        docs = self.retriever.invoke(question)
-        if self.rerank_enabled:
-            docs = rerank(question, docs, top_k=settings.TOP_K)
+        docs = self._retrieve(question)
         chunks = self.chain.stream(
             {"question": question, "context": _format_context(docs)}
         )
