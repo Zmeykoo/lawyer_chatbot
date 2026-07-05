@@ -13,11 +13,14 @@ a time — make sure ``app.py`` (and any other reader) is stopped first.
 
 Metrics
 -------
-Reference-free (always run; need no ground truth):
+Retrieval / ranking (deterministic, no LLM; need ``reference_articles``):
+  * precision@k, recall@k, hit_rate@k, ndcg@k, MRR, MAP — see retrieval_metrics.py.
+
+Answer quality via RAGAS — reference-free (always run; need no ground truth):
   * faithfulness       — is every claim in the answer grounded in retrieved context?
   * answer_relevancy   — does the answer actually address the question?
 
-Reference-based (run only when every row has a non-empty ``reference``):
+Answer quality via RAGAS — reference-based (run only when every row has ``reference``):
   * context_precision  — are the retrieved articles the ones the reference needs?
   * context_recall     — did retrieval surface everything the reference needs?
 
@@ -38,6 +41,7 @@ from langchain_openai import ChatOpenAI  # noqa: E402
 
 from chatbot import LawyerChatbot  # noqa: E402
 from config import settings  # noqa: E402
+from eval.retrieval_metrics import evaluate_retrieval, normalize  # noqa: E402
 from vectorstore import get_embeddings  # noqa: E402
 
 
@@ -58,20 +62,23 @@ def load_golden(path: Path) -> list[dict]:
     return rows
 
 
-def build_samples(rows: list[dict], bot: LawyerChatbot) -> tuple[list, bool]:
-    """Run each question through the bot and build RAGAS samples.
+def run_bot(rows: list[dict], bot: LawyerChatbot) -> tuple[list, list, bool]:
+    """Run each question through the bot once, in a single pass.
 
-    Returns the samples and whether every row carried a ``reference`` (which gates
-    the reference-based metrics).
+    Returns RAGAS samples, per-query ``(retrieved_article_ids, relevant_ids)``
+    pairs for the IR metrics, and whether every row carried a ``reference``
+    (which gates the RAGAS reference-based metrics).
     """
     from ragas import SingleTurnSample
 
     samples: list[SingleTurnSample] = []
+    retrieval: list[tuple[list[str], set[str]]] = []
     have_all_refs = True
     for i, row in enumerate(rows, 1):
         question = row["question"]
         print(f"[{i}/{len(rows)}] {question[:70]}…", flush=True)
         answer = bot.ask(question)
+
         reference = (row.get("reference") or "").strip()
         have_all_refs = have_all_refs and bool(reference)
         samples.append(
@@ -82,7 +89,18 @@ def build_samples(rows: list[dict], bot: LawyerChatbot) -> tuple[list, bool]:
                 reference=reference or None,
             )
         )
-    return samples, have_all_refs
+
+        # Ranked article ids as returned (already deduped best-first, ≤ TOP_K)
+        # vs the ground-truth relevant set for the IR metrics.
+        retrieved_ids = [
+            normalize(d.metadata.get("article"))
+            for d in answer.sources
+            if d.metadata.get("article") is not None
+        ]
+        relevant_ids = {normalize(a) for a in row.get("reference_articles") or []}
+        retrieval.append((retrieved_ids, relevant_ids))
+
+    return samples, retrieval, have_all_refs
 
 
 def main() -> None:
@@ -95,21 +113,55 @@ def main() -> None:
     )
     parser.add_argument(
         "--judge-model",
-        default="gpt-4o",
+        default="gpt-5.4-mini",
         help="LLM that scores the answers (use a strong one; default gpt-4o).",
     )
     parser.add_argument(
         "--limit", type=int, default=None, help="Only evaluate the first N rows."
     )
     parser.add_argument(
+        "--k-values",
+        default="1,3,5",
+        help="Comma-separated k cutoffs for precision/recall/hit_rate/ndcg (default 1,3,5).",
+    )
+    parser.add_argument(
+        "--no-ragas",
+        action="store_true",
+        help="Skip the RAGAS answer-quality metrics; run only the IR retrieval metrics.",
+    )
+    parser.add_argument(
         "--out", type=Path, default=None, help="Optional CSV path for per-row scores."
     )
     args = parser.parse_args()
+
+    k_values = [int(k) for k in args.k_values.split(",") if k.strip()]
 
     rows = load_golden(args.dataset)
     if args.limit:
         rows = rows[: args.limit]
 
+    bot = LawyerChatbot()
+    print(
+        f"Config: collection={bot.collection_name} · llm={settings.LLM_MODEL} · "
+        f"rerank={'on' if bot.rerank_enabled else 'off'} · top_k={settings.TOP_K}\n"
+    )
+    samples, retrieval, have_all_refs = run_bot(rows, bot)
+
+    # --- Retrieval / ranking metrics (deterministic, no LLM) ---
+    ir_scores = evaluate_retrieval(retrieval, k_values)
+    print("\n=== Retrieval metrics ===")
+    if not ir_scores:
+        print("(no rows had `reference_articles` — nothing to score)")
+    else:
+        scored = int(ir_scores.pop("queries_scored"))
+        print(f"(over {scored}/{len(rows)} rows with ground-truth articles)")
+        for name, value in ir_scores.items():
+            print(f"  {name:<14} {value:.4f}")
+
+    if args.no_ragas:
+        return
+
+    # --- Answer-quality metrics (RAGAS, LLM judge) ---
     from ragas import EvaluationDataset, evaluate
     from ragas.embeddings import LangchainEmbeddingsWrapper
     from ragas.llms import LangchainLLMWrapper
@@ -119,13 +171,6 @@ def main() -> None:
         LLMContextRecall,
         ResponseRelevancy,
     )
-
-    bot = LawyerChatbot()
-    print(
-        f"Config: collection={bot.collection_name} · llm={settings.LLM_MODEL} · "
-        f"rerank={'on' if bot.rerank_enabled else 'off'} · top_k={settings.TOP_K}\n"
-    )
-    samples, have_all_refs = build_samples(rows, bot)
 
     # Wrap the app's own embeddings so answer_relevancy uses the same encoder the
     # pipeline retrieves with; a separate strong model does the judging.
@@ -139,8 +184,8 @@ def main() -> None:
         metrics += [LLMContextPrecisionWithReference(), LLMContextRecall()]
     else:
         print(
-            "Note: some rows lack a `reference` — running reference-free metrics "
-            "only (add ground-truth answers to enable context precision/recall).\n"
+            "\nNote: some rows lack a `reference` — running reference-free RAGAS "
+            "metrics only (add ground-truth answers to enable context precision/recall)."
         )
 
     result = evaluate(
