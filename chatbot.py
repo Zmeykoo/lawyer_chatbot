@@ -1,10 +1,11 @@
 """RAG chatbot: retrieve relevant articles from Qdrant and answer with the LLM."""
 from __future__ import annotations
 
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 
 from langchain_core.documents import Document
-from langchain_core.messages import AIMessage
+from langchain_core.messages import AIMessage, AIMessageChunk
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
 
@@ -89,6 +90,34 @@ class Answer:
     usage: TokenUsage = field(default_factory=TokenUsage)
 
 
+@dataclass
+class StreamingAnswer:
+    """Answer that streams the LLM text as it is generated.
+
+    ``sources`` are known up front (retrieval finishes before generation starts).
+    Iterating the object yields text pieces (drive it with ``st.write_stream``);
+    once iteration completes, ``text`` holds the full answer and ``usage`` the
+    token accounting, both accumulated from the streamed chunks.
+    """
+
+    sources: list[Document]
+    _chunks: Iterator[AIMessageChunk]
+    text: str = ""
+    usage: TokenUsage = field(default_factory=TokenUsage)
+
+    def __iter__(self) -> Iterator[str]:
+        merged: AIMessageChunk | None = None
+        for chunk in self._chunks:
+            merged = chunk if merged is None else merged + chunk
+            if chunk.content:
+                self.text += chunk.content
+                yield chunk.content
+        # The concatenated chunk carries the aggregated usage_metadata that
+        # arrives (with stream_usage=True) in the final chunk of the stream.
+        if merged is not None:
+            self.usage = TokenUsage.from_message(merged)
+
+
 def _format_context(docs: list[Document]) -> str:
     return "\n\n".join(
         f"[{d.metadata.get('title', d.metadata.get('article', 'джерело'))}]\n{d.page_content}"
@@ -102,6 +131,9 @@ class LawyerChatbot:
             model=settings.LLM_MODEL,
             temperature=settings.TEMPERATURE,
             api_key=settings.OPENAI_API_KEY,
+            # Emit usage_metadata in the final streamed chunk so token/cost
+            # accounting still works when we stream the answer.
+            stream_usage=True,
         )
         # With reranking on, retrieve a larger candidate pool and let the
         # cross-encoder narrow it down to TOP_K; otherwise fetch TOP_K directly.
@@ -129,6 +161,16 @@ class LawyerChatbot:
             sources=docs,
             usage=TokenUsage.from_message(message),
         )
+
+    def stream(self, question: str) -> StreamingAnswer:
+        """Retrieve context, then stream the LLM answer token by token."""
+        docs = self.retriever.invoke(question)
+        if self.rerank_enabled:
+            docs = rerank(question, docs, top_k=settings.TOP_K)
+        chunks = self.chain.stream(
+            {"question": question, "context": _format_context(docs)}
+        )
+        return StreamingAnswer(sources=docs, _chunks=chunks)
 
 
 if __name__ == "__main__":

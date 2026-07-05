@@ -57,8 +57,10 @@ def main() -> None:
 
         with st.chat_message("assistant"):
             with st.spinner("Аналізую Кримінальний кодекс..."):
-                answer = bot.ask(question)
-            st.markdown(answer.text)
+                answer = bot.stream(question)
+            # Streams tokens as they arrive; returns the full text when done.
+            # After this call answer.text and answer.usage are populated.
+            st.write_stream(answer)
             with st.expander("Використані статті"):
                 for doc in answer.sources:
                     st.markdown(
