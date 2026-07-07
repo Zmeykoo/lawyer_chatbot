@@ -1,0 +1,99 @@
+[project]
+name = "lawyer-chatbot"
+version = "0.1.0"
+description = "Ukrainian criminal-law RAG assistant over the Criminal Code of Ukraine (ККУ)."
+readme = "README.md"
+requires-python = ">=3.11,<3.13"
+
+# Runtime dependencies. This is the single source of truth for what the app
+# needs to run in production; `uv.lock` pins the exact resolved versions.
+#
+# NOTE: `torch` is intentionally NOT listed here. It is pulled in transitively by
+# sentence-transformers, but which *build* (CPU vs CUDA) you get is controlled by
+# the mutually exclusive `cpu` / `cuda` extras below, so that prod can stay slim
+# and dev machines can use the GPU. Always install with exactly one of them.
+dependencies = [
+    # --- Core LLM / RAG stack ---
+    "langchain==0.3.27",
+    "langchain-community==0.3.27",
+    "langchain-openai==0.3.28",
+    "langchain-qdrant==0.2.0",
+    "langchain-text-splitters==0.3.9",
+    "openai==1.99.1",
+    "qdrant-client==1.15.1",
+    "tiktoken==0.9.0",
+
+    # --- Hugging Face encoders (EMBEDDING_PROVIDER=huggingface + reranker) ---
+    "langchain-huggingface==0.3.0",
+    "sentence-transformers==3.4.1",
+    "sentencepiece==0.2.1",
+
+    # --- Web UI ---
+    "streamlit==1.48.0",
+
+    # --- Document loading ---
+    "PyPDF2==3.0.1",
+    "python-docx==1.1.2",
+
+    # --- Utilities ---
+    "python-dotenv==1.1.0",
+    "tqdm>=4.67",
+    "pandas==2.2.3",
+    "numpy==2.2.5",
+]
+
+[project.optional-dependencies]
+# Mutually exclusive torch builds — select exactly one (see [tool.uv] below).
+#   uv sync --extra cpu     # prod / CPU-only machines
+#   uv sync --extra cuda    # dev boxes with an NVIDIA GPU
+cpu = ["torch>=2.6"]
+cuda = ["torch>=2.6"]
+
+# PEP 735 dev-only dependency groups. Not shipped in prod; installed by default
+# on a local `uv sync` (see tool.uv.default-groups) and skipped in Docker via
+# `--no-default-groups`.
+[dependency-groups]
+dev = [
+    "ipykernel==6.29.5",
+    "black==22.10.0",
+    "pre-commit>=3.7",
+]
+# Offline RAGAS evaluation harness (eval/). Heavy, dev-only.
+eval = [
+    "ragas>=0.2",
+]
+
+[tool.uv]
+# Install the app itself as source, not as a built wheel — this is an
+# application, not a library, so there is nothing to build/package.
+package = false
+# `cpu` and `cuda` provide the same top-level package (torch) from different
+# indexes; declaring them as conflicting lets uv lock both variants side by side.
+conflicts = [
+    [{ extra = "cpu" }, { extra = "cuda" }],
+]
+# Local `uv sync` pulls dev + eval tooling; Docker opts out with --no-default-groups.
+default-groups = ["dev", "eval"]
+
+# Route torch to the right PyTorch index depending on the active extra. The
+# `cpu` index ships CPU-only wheels; `cuda` ships the cu130 build to match the
+# host driver / installed torch (2.12.x +cu130).
+[tool.uv.sources]
+torch = [
+    { index = "pytorch-cpu", extra = "cpu" },
+    { index = "pytorch-cuda", extra = "cuda" },
+]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[[tool.uv.index]]
+name = "pytorch-cuda"
+url = "https://download.pytorch.org/whl/cu130"
+explicit = true
+
+[tool.black]
+line-length = 88
+target-version = ["py311"]

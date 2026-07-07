@@ -40,7 +40,7 @@ class Settings:
     # --- Ingestion / retrieval ---
     DOCS_DIR: str = os.getenv("DOCS_DIR", "docs")
     # File(s) that are already cleaned and split by "Стаття N."
-    SOURCE_FILE: str = os.getenv("SOURCE_FILE", "docs/ukr_cc_ready.txt")
+    SOURCE_FILE: str = os.getenv("SOURCE_FILE", "data/docs/ukr_cc_ready.txt")
     CHUNK_SIZE: int = int(os.getenv("CHUNK_SIZE", "1200"))
     CHUNK_OVERLAP: int = int(os.getenv("CHUNK_OVERLAP", "150"))
     TOP_K: int = int(os.getenv("TOP_K", "5"))
