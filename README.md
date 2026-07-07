@@ -3,7 +3,7 @@
 
 The assistant is a **RAG** (Retrieval-Augmented Generation) application:
 
-1. `ingest.py` splits the Criminal Code (`docs/ukr_cc_ready.txt`) into one chunk per
+1. `ingest.py` splits the Criminal Code (`data/docs/ukr_cc_ready.txt`) into one chunk per
    article (`Стаття N.`), embeds them with OpenAI embeddings and stores the vectors
    in an **embedded Qdrant** vector database that runs in-process and persists to a
    local folder (`qdrant_data/`) — no server or separate container required.
@@ -28,14 +28,22 @@ Qdrant is embedded — it runs inside the Python process and stores its data in 
 
 ## Quickstart (local)
 
-```bash
-python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env          # add your OPENAI_API_KEY
+Dependencies are managed with [uv](https://docs.astral.sh/uv/); `uv.lock` pins
+every version. `torch` comes in two mutually exclusive flavours — pick one:
 
-python ingest.py --recreate   # build the vector index into qdrant_data/
-streamlit run app.py          # launch the chat UI
+```bash
+uv sync --extra cpu           # CPU-only
+uv sync --extra cuda          # NVIDIA GPU (cu130 build) — for HF encoders/reranker
+
+cp .env.example .env          # add your OPENAI_API_KEY
+# for GPU encoding: set HF_DEVICE=cuda (and RERANK_DEVICE=cuda) in .env
+
+uv run python ingest.py --recreate   # build the vector index into qdrant_data/
+uv run streamlit run app.py          # launch the chat UI
 ```
+
+`uv sync` also installs the `dev` and `eval` tooling groups by default; add
+`--no-default-groups` for a runtime-only environment.
 
 Open http://localhost:8501
 

@@ -153,8 +153,6 @@ class LawyerChatbot:
             model=settings.LLM_MODEL,
             temperature=settings.TEMPERATURE,
             api_key=settings.OPENAI_API_KEY,
-            # Emit usage_metadata in the final streamed chunk so token/cost
-            # accounting still works when we stream the answer.
             stream_usage=True,
         )
         # With reranking on, retrieve a larger candidate pool and let the
@@ -165,14 +163,10 @@ class LawyerChatbot:
         fetch_k = (
             settings.RERANK_CANDIDATES if self.rerank_enabled else settings.TOP_K * 4
         )
-        # Bind to the most recent ingest; its timestamped name tells you when it
-        # was built.
         self.collection_name = latest_collection_name(get_client())
         self.retriever = get_vectorstore(
             collection_name=self.collection_name
         ).as_retriever(search_kwargs={"k": fetch_k})
-        # Keep the raw AIMessage (no StrOutputParser) so token usage metadata
-        # survives the chain and can be accounted for.
         self.chain = PROMPT | self.llm
 
     def _retrieve(self, question: str) -> list[Document]:
